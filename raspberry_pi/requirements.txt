@@ -16,9 +16,6 @@ scikit-learn==1.5.1
 numpy==1.26.4
 pandas==2.2.2
 
-# ── IA Claude (Anthropic) — Smart AI autonome ─────────────────────────────────
-anthropic>=0.40.0
-
 # ── API REST ──────────────────────────────────────────────────────────────────
 Flask==3.0.3
 flask-cors==4.0.1          # CORS pour ngrok + dashboard HTML
