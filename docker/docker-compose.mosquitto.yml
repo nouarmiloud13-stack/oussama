@@ -1,0 +1,83 @@
+# ============================================================
+# docker-compose.yml — extrait service gnl_mosquitto
+# (à fusionner dans votre docker-compose complet)
+#
+# Montre le câblage correct pour les trois bugs corrigés.
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # Broker MQTT
+  # ----------------------------------------------------------
+  gnl_mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: gnl_mosquitto
+    restart: unless-stopped
+
+    # Fix Bug #2 : l'entrypoint crée le fichier passwd au démarrage
+    entrypoint: ["/mosquitto/config/mosquitto-entrypoint.sh"]
+
+    environment:
+      MQTT_USER: ${MQTT_USER:-khidmeti}          # défini dans .env
+      MQTT_PASSWORD: ${MQTT_PASSWORD:?Obligatoire} # plante si absent
+
+    volumes:
+      # Config (mosquitto.conf + entrypoint)
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./infra/mosquitto/mosquitto-entrypoint.sh:/mosquitto/config/mosquitto-entrypoint.sh:ro
+      # Données persistantes
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+      # passwd est créé par l'entrypoint dans /mosquitto/config/ à l'intérieur
+      # du container → monter un volume nommé pour le persister entre redémarrages
+      - mosquitto_config:/mosquitto/config
+
+    ports:
+      - "1883:1883"
+      # - "9001:9001"   # WebSocket si activé dans mosquitto.conf
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mosquitto_sub",
+          "-h", "localhost",
+          "-p", "1883",
+          "-u", "${MQTT_USER:-khidmeti}",
+          "-P", "${MQTT_PASSWORD:-changeme}",
+          "-t",  "$$SYS/#",
+          "-C",  "1",
+          "--quiet"
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  # ----------------------------------------------------------
+  # Simulateur
+  # ----------------------------------------------------------
+  simulator:
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile.simulator   # Fix Bug #3 : CMD shell-form
+    container_name: gnl_simulator
+    restart: unless-stopped
+    depends_on:
+      gnl_mosquitto:
+        condition: service_healthy       # attend que Mosquitto soit Healthy
+
+    environment:
+      MQTT_HOST: gnl_mosquitto
+      MQTT_PORT: "1883"                  # écrase l'ENV du Dockerfile si besoin
+      MQTT_USER: ${MQTT_USER:-khidmeti}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:?Obligatoire}
+
+# ----------------------------------------------------------
+# Volumes nommés
+# ----------------------------------------------------------
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  mosquitto_config:   # persiste le fichier passwd entre redémarrages

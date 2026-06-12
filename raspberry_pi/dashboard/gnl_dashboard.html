@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GNL Edge Monitor — Système IoT</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #060d1a; --bg2: #0a1628; --bg3: #0f1f38; --bg4: #071020;
+  --accent: #00d4ff; --accent2: #00ff9d;
+  --danger: #ff4060; --warn: #ffb020; --ok: #00ff9d;
+  --border: rgba(0,212,255,0.18); --border2: rgba(0,212,255,0.08);
+  --text:   #cde8ff; --muted: #4a7fa8;
+  --mono:   'Share Tech Mono', monospace; --sans: 'Exo 2', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;top:-100%;left:0;right:0;height:200px;background:linear-gradient(transparent,rgba(0,212,255,0.04),transparent);animation:scan 6s linear infinite;pointer-events:none;z-index:1}
+@keyframes scan{to{top:110%}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse-ring{0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,.4)}50%{box-shadow:0 0 20px 8px rgba(0,212,255,.1)}}
+
+.page{display:none;min-height:100vh;position:relative;z-index:2}
+.page.active{display:flex}
+
+/* ════ LOGIN ════ */
+#login-page{align-items:center;justify-content:center;flex-direction:column;padding:2rem}
+.login-container{width:100%;max-width:420px}
+.login-logo{text-align:center;margin-bottom:2.5rem}
+.hex-ring{width:80px;height:80px;border:2px solid var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto;animation:pulse-ring 3s ease-in-out infinite;position:relative}
+.hex-ring::before{content:'';position:absolute;inset:-8px;border:1px solid rgba(0,212,255,0.2);border-radius:50%;animation:pulse-ring 3s ease-in-out infinite .5s}
+.hex-icon{font-family:var(--mono);font-size:28px;color:var(--accent)}
+.login-title{font-family:var(--mono);font-size:22px;color:var(--accent);letter-spacing:4px;text-transform:uppercase;margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--muted);letter-spacing:2px;font-family:var(--mono)}
+.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:2rem;position:relative;overflow:hidden}
+.login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.field-group{margin-bottom:1.25rem}
+.field-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px;margin-bottom:8px;display:block}
+.field-wrap{position:relative;display:flex;align-items:center}
+.field-icon{position:absolute;left:14px;font-size:16px;color:var(--muted);font-family:var(--mono);z-index:1}
+.field-input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:12px 14px 12px 42px;color:var(--text);font-family:var(--mono);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
+.field-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.08)}
+.field-input::placeholder{color:#2a4a6a}
+.role-select{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1.5rem}
+.role-btn{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:10px;cursor:pointer;text-align:center;transition:all .2s;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:1px}
+.role-btn:hover{border-color:var(--border);color:var(--text)}
+.role-btn.selected{border-color:var(--accent);background:rgba(0,212,255,.06);color:var(--accent)}
+.role-icon{font-size:20px;display:block;margin-bottom:4px}
+.login-btn{width:100%;background:transparent;border:1px solid var(--accent);border-radius:8px;padding:14px;color:var(--accent);font-family:var(--mono);font-size:14px;letter-spacing:3px;cursor:pointer;text-transform:uppercase;position:relative;overflow:hidden;transition:all .3s}
+.login-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,212,255,.15),transparent);transition:left .4s}
+.login-btn:hover::before{left:100%}
+.login-btn:hover{background:rgba(0,212,255,.08);box-shadow:0 0 20px rgba(0,212,255,.2)}
+.login-btn:disabled{opacity:.4;cursor:not-allowed}
+.login-error{background:rgba(255,64,96,.1);border:1px solid rgba(255,64,96,.3);border-radius:6px;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--danger);margin-top:1rem;display:none}
+.status-bar{display:flex;align-items:center;gap:8px;margin-top:1.5rem;padding:10px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border2)}
+.status-dot{width:6px;height:6px;border-radius:50%;animation:blink 2s ease-in-out infinite}
+.dot-green{background:var(--accent2)}.dot-blue{background:var(--accent);animation-delay:.6s}.dot-warn{background:var(--warn);animation-delay:1.2s}
+.status-txt{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;flex:1}
+.ngrok-badge{margin-top:.75rem;padding:6px 12px;background:rgba(0,212,255,.06);border:1px solid var(--border2);border-radius:6px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;letter-spacing:1px}
+.ngrok-badge span{color:var(--accent)}
+.loading-bar{height:2px;background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);background-size:200% 100%;animation:loading 1.5s linear;margin-bottom:1.5rem}
+@keyframes loading{from{background-position:200%}to{background-position:-200%}}
+
+/* ════ DASHBOARD LAYOUT ════ */
+#dash-page{flex-direction:column}
+.topnav{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:var(--bg2);border-bottom:1px solid var(--border2);flex-shrink:0;z-index:10}
+.nav-brand{display:flex;align-items:center;gap:12px}
+.nav-dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);animation:blink 2s infinite}
+.nav-title{font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:2px}
+.nav-right{display:flex;align-items:center;gap:16px}
+.nav-user{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:rgba(0,212,255,.1);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--accent)}
+.logout-btn{background:transparent;border:1px solid rgba(255,64,96,.3);border-radius:6px;padding:6px 12px;color:var(--danger);font-family:var(--mono);font-size:11px;cursor:pointer;letter-spacing:1px;transition:all .2s}
+.logout-btn:hover{background:rgba(255,64,96,.08);border-color:var(--danger)}
+.api-indicator{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:20px;border:1px solid var(--border2)}
+.api-ok{color:var(--accent2);border-color:rgba(0,255,157,.2)}.api-err{color:var(--danger);border-color:rgba(255,64,96,.2)}
+.dash-body{display:flex;flex:1;overflow:hidden}
+
+/* ════ SIDEBAR ════ */
+.sidebar{width:210px;background:var(--bg2);border-right:1px solid var(--border2);padding:1rem 0;flex-shrink:0;overflow-y:auto}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);cursor:pointer;transition:all .15s;letter-spacing:1px;border-left:2px solid transparent}
+.sidebar-item:hover{color:var(--text);background:rgba(0,212,255,.04)}
+.sidebar-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,212,255,.06)}
+.sidebar-icon{font-size:16px;width:20px;text-align:center}
+.sidebar-section{font-family:var(--mono);font-size:9px;color:#1e3a5f;letter-spacing:3px;padding:16px 20px 6px;text-transform:uppercase}
+.sidebar-badge{margin-left:auto;background:rgba(255,64,96,.15);color:var(--danger);border-radius:20px;font-size:9px;padding:1px 7px;font-family:var(--mono)}
+
+/* ════ MAIN CONTENT ════ */
+.main-content{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.view{display:none;flex-direction:column;gap:16px;animation:fadeIn .3s ease}
+.view.active{display:flex}
+
+/* ════ METRIC CARDS ════ */
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.metric-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;transition:border-color .2s,transform .1s}
+.metric-card:hover{border-color:var(--border);transform:translateY(-1px)}
+.metric-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+.mc-green::after{background:var(--accent2)}.mc-blue::after{background:var(--accent)}.mc-warn::after{background:var(--warn)}.mc-danger::after{background:var(--danger)}
+.mc-label{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:2px;margin-bottom:8px}
+.mc-value{font-family:var(--mono);font-size:28px;font-weight:600;margin-bottom:4px}
+.mc-sub{font-size:11px;color:var(--muted)}
+.mc-green .mc-value{color:var(--accent2)}.mc-blue .mc-value{color:var(--accent)}.mc-warn .mc-value{color:var(--warn)}.mc-danger .mc-value{color:var(--danger)}
+.mc-badge{position:absolute;top:12px;right:12px;font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:20px}
+.badge-ok{background:rgba(0,255,157,.1);color:var(--accent2);border:1px solid rgba(0,255,157,.2)}
+.badge-warn{background:rgba(255,176,32,.1);color:var(--warn);border:1px solid rgba(255,176,32,.2)}
+.badge-danger{background:rgba(255,64,96,.1);color:var(--danger);border:1px solid rgba(255,64,96,.2)}
+
+/* ════ TANKS ════ */
+.tanks-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.tank-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px}
+.tank-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.tank-visual{display:flex;align-items:flex-end;gap:12px}
+.tank-cylinder{width:60px;height:120px;border:1px solid var(--border);border-radius:6px;position:relative;overflow:hidden;flex-shrink:0;background:var(--bg3)}
+.tank-fill{position:absolute;bottom:0;left:0;right:0;transition:height 1s ease}
+.fill-green{background:rgba(0,255,157,.3);border-top:1px solid var(--accent2)}
+.fill-blue{background:rgba(0,212,255,.2);border-top:1px solid var(--accent)}
+.fill-warn{background:rgba(255,176,32,.2);border-top:1px solid var(--warn)}
+.fill-danger{background:rgba(255,64,96,.2);border-top:1px solid var(--danger)}
+.tank-info{flex:1}
+.tank-pct{font-family:var(--mono);font-size:32px;font-weight:600;color:var(--accent)}
+.tank-stat{font-size:11px;color:var(--muted);margin-top:4px;font-family:var(--mono)}
+.net-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px}
+.net-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border2);font-family:var(--mono);font-size:12px}
+.net-row:last-child{border-bottom:none}
+.net-label{color:var(--muted);font-size:11px}
+.net-val{color:var(--text)}.net-ok{color:var(--accent2)}.net-active{color:var(--accent)}
+
+/* ════ CHART ════ */
+.chart-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.chart-title-txt{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px}
+canvas.chart{width:100%;height:140px;display:block}
+
+/* ════ ALERTS ════ */
+.alerts-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px}
+.alert-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border2);font-family:var(--mono);font-size:12px}
+.alert-row:last-child{border-bottom:none}
+.alert-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.alert-time{color:var(--muted);font-size:11px;width:55px;flex-shrink:0}
+.alert-msg{flex:1;color:var(--text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}
+.alert-level{font-size:9px;padding:2px 8px;border-radius:20px;flex-shrink:0}
+.bottom-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ════ CONTROL PANEL ════ */
+.control-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.control-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:20px}
+.ctrl-title{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:2px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.ctrl-status{font-family:var(--mono);font-size:24px;font-weight:600;margin-bottom:16px;color:var(--accent)}
+.ctrl-btns{display:flex;gap:10px;flex-wrap:wrap}
+.ctrl-btn{font-family:var(--mono);font-size:12px;letter-spacing:2px;cursor:pointer;border-radius:8px;padding:10px 20px;transition:all .2s;border:1px solid;text-transform:uppercase}
+.btn-on{background:rgba(0,255,157,.08);border-color:var(--accent2);color:var(--accent2)}
+.btn-on:hover{background:rgba(0,255,157,.15);box-shadow:0 0 14px rgba(0,255,157,.2)}
+.btn-off{background:rgba(255,176,32,.08);border-color:var(--warn);color:var(--warn)}
+.btn-off:hover{background:rgba(255,176,32,.15)}
+.btn-open{background:rgba(0,212,255,.08);border-color:var(--accent);color:var(--accent)}
+.btn-open:hover{background:rgba(0,212,255,.15)}
+.btn-close{background:rgba(74,127,168,.08);border-color:var(--muted);color:var(--muted)}
+.btn-close:hover{background:rgba(74,127,168,.15);color:var(--text)}
+.ctrl-btn:disabled{opacity:.3;cursor:not-allowed}
+.esd-card{background:rgba(255,64,96,.04);border:1px solid rgba(255,64,96,.3);border-radius:10px;padding:20px;grid-column:1/-1}
+.esd-title{font-family:var(--mono);font-size:11px;color:var(--danger);letter-spacing:2px;margin-bottom:8px}
+.esd-desc{font-size:12px;color:var(--muted);margin-bottom:16px;font-family:var(--mono)}
+.btn-esd{background:rgba(255,64,96,.12);border:2px solid var(--danger);color:var(--danger);font-family:var(--mono);font-size:14px;letter-spacing:4px;cursor:pointer;border-radius:8px;padding:14px 32px;transition:all .2s;text-transform:uppercase}
+.btn-esd:hover{background:rgba(255,64,96,.25);box-shadow:0 0 20px rgba(255,64,96,.3)}
+.cmd-feedback{margin-top:12px;font-family:var(--mono);font-size:11px;padding:8px 12px;border-radius:6px;display:none}
+.cmd-ok{background:rgba(0,255,157,.1);color:var(--accent2);border:1px solid rgba(0,255,157,.2)}
+.cmd-err{background:rgba(255,64,96,.1);color:var(--danger);border:1px solid rgba(255,64,96,.2)}
+
+/* ════ AI PANEL ════ */
+.ai-grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.ai-diag-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:20px}
+.ai-severity{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;padding:4px 14px;border-radius:20px;margin-bottom:12px;letter-spacing:2px}
+.sev-info{background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.2)}
+.sev-attention{background:rgba(255,176,32,.1);color:var(--warn);border:1px solid rgba(255,176,32,.2)}
+.sev-danger{background:rgba(255,64,96,.1);color:var(--danger);border:1px solid rgba(255,64,96,.2)}
+.sev-critique{background:rgba(255,64,96,.2);color:var(--danger);border:1px solid var(--danger);animation:blink 1s infinite}
+.ai-diag-text{font-family:var(--mono);font-size:14px;color:var(--text);line-height:1.6;margin-bottom:12px}
+.ai-details{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5;padding:10px;background:var(--bg3);border-radius:6px;white-space:pre-line}
+.ai-source{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:10px}
+.ai-source span{color:var(--accent)}
+.pred-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:20px}
+.pred-item{padding:10px 0;border-bottom:1px solid var(--border2);font-family:var(--mono);font-size:12px}
+.pred-item:last-child{border-bottom:none}
+.pred-label{color:var(--muted);font-size:10px;letter-spacing:1px;margin-bottom:4px}
+.pred-value{font-size:18px;font-weight:600}
+.pred-ok{color:var(--accent2)}.pred-warn{color:var(--warn)}.pred-danger{color:var(--danger)}.pred-blue{color:var(--accent)}
+.reco-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px}
+.reco-item{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border2);font-family:var(--mono);font-size:11px;color:var(--text)}
+.reco-item:last-child{border-bottom:none}
+.reco-bullet{color:var(--accent);flex-shrink:0}
+.ai-commands-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px}
+.ai-cmd-tag{display:inline-block;background:rgba(255,64,96,.1);color:var(--danger);border:1px solid rgba(255,64,96,.2);border-radius:4px;font-family:var(--mono);font-size:10px;padding:3px 10px;margin:3px}
+.ai-full-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ════ HISTORY TABLE ════ */
+.history-card{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px;overflow:auto}
+.hist-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+.hist-table th{color:var(--muted);letter-spacing:1px;padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);font-size:9px;text-transform:uppercase}
+.hist-table td{padding:7px 10px;border-bottom:1px solid var(--border2);color:var(--text)}
+.hist-table tr:hover td{background:rgba(0,212,255,.03)}
+.hist-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.hist-sum-card{background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:12px}
+.hist-sum-label{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:6px}
+.hist-sum-value{font-family:var(--mono);font-size:18px;color:var(--accent)}
+
+/* ════ SECTION TITLES ════ */
+.section-title{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border2)}
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.refresh-btn{font-family:var(--mono);font-size:10px;color:var(--muted);background:transparent;border:1px solid var(--border2);border-radius:4px;padding:4px 10px;cursor:pointer;transition:all .15s}
+.refresh-btn:hover{color:var(--accent);border-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- ════ LOGIN ════ -->
+<div class="page active" id="login-page">
+  <div class="login-container">
+    <div class="login-logo">
+      <div class="hex-ring"><span class="hex-icon">⬡</span></div>
+      <div class="login-title" style="margin-top:12px">GNL Edge Monitor</div>
+      <div class="login-sub">Système IoT Distribué — M2 RSID 2025-2026</div>
+    </div>
+
+    <div class="login-card">
+      <div class="loading-bar"></div>
+      <div style="margin-bottom:1.25rem">
+        <div class="field-label">RÔLE SYSTÈME</div>
+        <div class="role-select">
+          <div class="role-btn selected" onclick="selectRole(this,'admin')">
+            <span class="role-icon">◈</span>Administrateur
+          </div>
+          <div class="role-btn" onclick="selectRole(this,'operator')">
+            <span class="role-icon">◉</span>Opérateur
+          </div>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">IDENTIFIANT</label>
+        <div class="field-wrap">
+          <span class="field-icon">▸</span>
+          <input class="field-input" id="username" type="text" placeholder="admin / operator" autocomplete="off">
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">MOT DE PASSE</label>
+        <div class="field-wrap">
+          <span class="field-icon">◈</span>
+          <input class="field-input" id="password" type="password" placeholder="••••••••">
+        </div>
+      </div>
+      <button class="login-btn" id="login-btn" onclick="doLogin()">CONNEXION</button>
+      <div class="login-error" id="login-error">✕ Identifiants incorrects — Accès refusé</div>
+      <div class="ngrok-badge">🌐 API : <span id="api-url-display">détection…</span></div>
+      <div class="status-bar">
+        <div class="status-dot dot-green"></div>
+        <div class="status-txt" id="api-status">VÉRIFICATION API…</div>
+        <div class="status-dot dot-blue"></div>
+        <div class="status-txt">ISOLATION FOREST</div>
+        <div class="status-dot dot-warn"></div>
+        <div class="status-txt">IA EN ÉCOUTE</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:1rem;font-family:var(--mono);font-size:10px;color:#1e3a5f;letter-spacing:2px">
+      RPi4 EDGE · SQLite · AnomalyEngine v2.1 · SmartAI Fallback
+    </div>
+  </div>
+</div>
+
+<!-- ════ DASHBOARD ════ -->
+<div class="page" id="dash-page">
+  <nav class="topnav">
+    <div class="nav-brand">
+      <div class="nav-dot"></div>
+      <span class="nav-title">GNL EDGE MONITOR</span>
+      <span style="font-family:var(--mono);font-size:10px;color:#1e3a5f;letter-spacing:2px;margin-left:8px">v2.1.0</span>
+    </div>
+    <div class="nav-right">
+      <div id="api-indicator" class="api-indicator api-ok">● API OK</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted)" id="clock">00:00:00</div>
+      <div class="nav-user">
+        <div class="user-avatar" id="user-initial">A</div>
+        <span id="user-name">admin</span>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">DÉCONNEXION</button>
+    </div>
+  </nav>
+
+  <div class="dash-body">
+    <!-- ═ SIDEBAR ═ -->
+    <aside class="sidebar">
+      <div class="sidebar-section">Surveillance</div>
+      <div class="sidebar-item active" onclick="switchView('overview',this)">
+        <span class="sidebar-icon">◈</span>Dashboard
+      </div>
+      <div class="sidebar-item" onclick="switchView('alerts',this)">
+        <span class="sidebar-icon">▲</span>Alertes
+        <span class="sidebar-badge" id="alert-count">0</span>
+      </div>
+      <div class="sidebar-section">Intelligence IA</div>
+      <div class="sidebar-item" onclick="switchView('ia',this)">
+        <span class="sidebar-icon">⬡</span>IA / Prédiction
+      </div>
+      <div class="sidebar-section">Contrôle</div>
+      <div class="sidebar-item" onclick="switchView('control',this)">
+        <span class="sidebar-icon">◉</span>Contrôle Manuel
+      </div>
+      <div class="sidebar-section">Historique</div>
+      <div class="sidebar-item" onclick="switchView('history',this)">
+        <span class="sidebar-icon">◇</span>Historique DB
+      </div>
+      <div class="sidebar-item" onclick="switchView('events',this)">
+        <span class="sidebar-icon">▸</span>Événements
+      </div>
+      <div class="sidebar-section">Réseau</div>
+      <div class="sidebar-item" onclick="switchView('network',this)">
+        <span class="sidebar-icon">◌</span>État Système
+      </div>
+    </aside>
+
+    <!-- ═ MAIN ═ -->
+    <main class="main-content">
+
+      <!-- ── VUE OVERVIEW ── -->
+      <div id="view-overview" class="view active">
+        <div class="metrics-grid">
+          <div class="metric-card mc-green">
+            <span class="mc-badge badge-ok" id="badge-n1">NORMAL</span>
+            <div class="mc-label">NIVEAU R1</div>
+            <div class="mc-value" id="d-n1">--</div>
+            <div class="mc-sub">Réservoir source</div>
+          </div>
+          <div class="metric-card mc-blue">
+            <span class="mc-badge badge-ok" id="badge-n2">NORMAL</span>
+            <div class="mc-label">NIVEAU R2</div>
+            <div class="mc-value" id="d-n2">--</div>
+            <div class="mc-sub">Réservoir destination</div>
+          </div>
+          <div class="metric-card mc-green">
+            <span class="mc-badge badge-ok" id="badge-gaz">SÉCURISÉ</span>
+            <div class="mc-label">GAZ MQ-4</div>
+            <div class="mc-value" id="d-gaz">--</div>
+            <div class="mc-sub">Méthane CH₄ (ADC)</div>
+          </div>
+          <div class="metric-card mc-blue">
+            <span class="mc-badge badge-ok" id="badge-ia">NOMINAL</span>
+            <div class="mc-label">SCORE IA</div>
+            <div class="mc-value" id="d-ia">--</div>
+            <div class="mc-sub">Risque anomalie</div>
+          </div>
+        </div>
+
+        <div class="tanks-row">
+          <div class="tank-card">
+            <div class="tank-title">
+              RÉSERVOIR 1 — SOURCE
+              <span id="pump-badge" style="font-size:9px;padding:2px 8px;border-radius:20px;background:rgba(74,127,168,.1);color:var(--muted);border:1px solid var(--border2)">POMPE --</span>
+            </div>
+            <div class="tank-visual">
+              <div class="tank-cylinder">
+                <div class="tank-fill fill-green" id="fill-r1" style="height:0%"></div>
+              </div>
+              <div class="tank-info">
+                <div class="tank-pct" id="pct-r1">--</div>
+                <div class="tank-stat">HC-SR04: <span style="color:var(--accent2)">actif</span></div>
+                <div class="tank-stat">DS18B20: <span id="t1-val" style="color:var(--accent)">--°C</span></div>
+                <div class="tank-stat">Prédit 5min: <span id="r1-pred" style="color:var(--muted)">--</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tank-card">
+            <div class="tank-title">
+              RÉSERVOIR 2 — DESTINATION
+              <span id="valve-badge" style="font-size:9px;padding:2px 8px;border-radius:20px;background:rgba(74,127,168,.1);color:var(--muted);border:1px solid var(--border2)">VANNE --</span>
+            </div>
+            <div class="tank-visual">
+              <div class="tank-cylinder">
+                <div class="tank-fill fill-blue" id="fill-r2" style="height:0%"></div>
+              </div>
+              <div class="tank-info">
+                <div class="tank-pct" id="pct-r2" style="color:var(--accent)">--</div>
+                <div class="tank-stat">HC-SR04: <span style="color:var(--accent2)">actif</span></div>
+                <div class="tank-stat">DS18B20: <span id="t2-val" style="color:var(--accent)">--°C</span></div>
+                <div class="tank-stat">Prédit 5min: <span id="r2-pred" style="color:var(--muted)">--</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="net-card">
+            <div class="tank-title">CAPTEURS &amp; RÉSEAU</div>
+            <div class="net-row"><span class="net-label">Pression BMP280</span><span class="net-val" id="d-pression">-- hPa</span></div>
+            <div class="net-row"><span class="net-label">Température R1</span><span id="t1-net" class="net-active">--°C</span></div>
+            <div class="net-row"><span class="net-label">Gaz MQ-4</span><span id="gaz-net" class="net-active">-- ADC</span></div>
+            <div class="net-row"><span class="net-label">Score IF</span><span id="if-net" class="net-val">--%</span></div>
+            <div class="net-row"><span class="net-label">Source IA</span><span id="ia-src" class="net-ok">--</span></div>
+            <div class="net-row"><span class="net-label">Tendance Gaz</span><span id="gaz-trend" class="net-val">--</span></div>
+          </div>
+        </div>
+
+        <div class="bottom-row">
+          <div class="chart-card">
+            <div class="chart-header">
+              <span class="chart-title-txt">HISTORIQUE NIVEAUX (60 dernières mesures)</span>
+            </div>
+            <canvas id="c-hist" class="chart" width="600" height="140"></canvas>
+          </div>
+          <div class="alerts-card">
+            <div class="section-hdr">
+              <div class="tank-title" style="margin-bottom:0">ALERTES RÉCENTES</div>
+              <button class="refresh-btn" onclick="fetchAlerts()">↻ RAFRAÎCHIR</button>
+            </div>
+            <div id="alerts-mini"></div>
+          </div>
+        </div>
+
+        <!-- Diagnostic IA rapide -->
+        <div class="alert-card" style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px">
+          <div class="section-hdr">
+            <span class="section-title">DIAGNOSTIC IA TEMPS RÉEL</span>
+            <span id="ia-sev-mini" class="ai-severity sev-info">INFO</span>
+          </div>
+          <div id="ia-diag-mini" style="font-family:var(--mono);font-size:13px;color:var(--text);line-height:1.6">
+            En attente du premier diagnostic…
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VUE IA / PRÉDICTION ── -->
+      <div id="view-ia" class="view">
+        <div class="section-title">ANALYSE INTELLIGENTE — SMART AI</div>
+        <div class="ai-grid">
+          <div class="ai-diag-card">
+            <div id="ia-severity" class="ai-severity sev-info">● INFO</div>
+            <div id="ia-diagnostic" class="ai-diag-text">En attente d'analyse…</div>
+            <div id="ia-details" class="ai-details">--</div>
+            <div class="ai-source">Source : <span id="ia-source">--</span> &nbsp;|&nbsp; Mis à jour : <span id="ia-ts">--</span></div>
+          </div>
+          <div class="pred-card">
+            <div class="section-hdr" style="margin-bottom:12px">
+              <span class="section-title">PRÉDICTIONS 5MIN</span>
+            </div>
+            <div class="pred-item">
+              <div class="pred-label">R1 DANS 5 MIN</div>
+              <div class="pred-value pred-blue" id="pred-r1">--</div>
+            </div>
+            <div class="pred-item">
+              <div class="pred-label">R2 DANS 5 MIN</div>
+              <div class="pred-value pred-blue" id="pred-r2">--</div>
+            </div>
+            <div class="pred-item">
+              <div class="pred-label">TEMPS AVANT R2 PLEIN</div>
+              <div class="pred-value pred-warn" id="pred-t-plein">--</div>
+            </div>
+            <div class="pred-item">
+              <div class="pred-label">TEMPS AVANT R1 VIDE</div>
+              <div class="pred-value pred-warn" id="pred-t-vide">--</div>
+            </div>
+            <div class="pred-item">
+              <div class="pred-label">TENDANCE GAZ</div>
+              <div class="pred-value pred-ok" id="pred-gaz-trend">--</div>
+            </div>
+            <div class="pred-item">
+              <div class="pred-label">AUTONOMIE ESTIMÉE</div>
+              <div class="pred-value pred-blue" id="pred-autonomie">--</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ai-full-row">
+          <div class="reco-card" style="grid-column:1/3">
+            <div class="section-hdr" style="margin-bottom:10px">
+              <span class="section-title">RECOMMANDATIONS IA</span>
+            </div>
+            <div id="ia-recos">
+              <div class="reco-item"><span class="reco-bullet">▸</span>En attente d'analyse…</div>
+            </div>
+          </div>
+          <div class="ai-commands-card">
+            <div class="section-hdr" style="margin-bottom:10px">
+              <span class="section-title">COMMANDES GÉNÉRÉES</span>
+            </div>
+            <div id="ia-cmds">
+              <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Aucune commande</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scores IA -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div class="metric-card mc-blue">
+            <div class="mc-label">ISOLATION FOREST</div>
+            <div class="mc-value" id="ia-if-score">--</div>
+            <div class="mc-sub">Score anomalie multivarié</div>
+          </div>
+          <div class="metric-card mc-warn">
+            <div class="mc-label">RISQUE GLOBAL</div>
+            <div class="mc-value" id="ia-risk">--</div>
+            <div class="mc-sub">Agrégé IF + prédictions + gaz</div>
+          </div>
+          <div class="metric-card mc-green">
+            <div class="mc-label">ALERTE GAZ</div>
+            <div class="mc-value" id="ia-gas-alert" style="font-size:16px;padding-top:8px">AUCUNE</div>
+            <div class="mc-sub">MQ-4 σ×2 adaptatif</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VUE CONTRÔLE MANUEL ── -->
+      <div id="view-control" class="view">
+        <div class="section-title">CONTRÔLE MANUEL — ACTIONNEURS</div>
+        <div id="ctrl-auth-warn" style="display:none;background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.3);border-radius:8px;padding:12px 16px;font-family:var(--mono);font-size:11px;color:var(--warn)">
+          ⚠ Contrôle manuel réservé aux administrateurs
+        </div>
+        <div class="control-grid">
+          <div class="control-card">
+            <div class="ctrl-title">◉ POMPE</div>
+            <div class="ctrl-status" id="ctrl-pump-status">--</div>
+            <div class="ctrl-btns">
+              <button class="ctrl-btn btn-on" onclick="sendCtrlCmd('pompe','ON')">▶ DÉMARRER</button>
+              <button class="ctrl-btn btn-off" onclick="sendCtrlCmd('pompe','OFF')">■ ARRÊTER</button>
+            </div>
+            <div class="cmd-feedback" id="fb-pompe"></div>
+          </div>
+          <div class="control-card">
+            <div class="ctrl-title">⬡ VANNE PRINCIPALE</div>
+            <div class="ctrl-status" id="ctrl-valve-status">--</div>
+            <div class="ctrl-btns">
+              <button class="ctrl-btn btn-open" onclick="sendCtrlCmd('vanne','OPEN')">▲ OUVRIR</button>
+              <button class="ctrl-btn btn-close" onclick="sendCtrlCmd('vanne','CLOSE')">▼ FERMER</button>
+            </div>
+            <div class="cmd-feedback" id="fb-vanne"></div>
+          </div>
+          <div class="esd-card">
+            <div class="esd-title">⚠ ARRÊT D'URGENCE — ESD</div>
+            <div class="esd-desc">
+              Coupe immédiatement pompe + vanne + envoie CMD:ESD à l'Arduino.<br>
+              Action irréversible — requiert redémarrage manuel du système.
+            </div>
+            <button class="btn-esd" onclick="triggerESD()">⚡ DÉCLENCHER ESD</button>
+            <div class="cmd-feedback" id="fb-esd"></div>
+          </div>
+        </div>
+
+        <!-- Dernières commandes exécutées -->
+        <div class="alerts-card">
+          <div class="section-hdr">
+            <span class="section-title">DERNIÈRES COMMANDES</span>
+            <button class="refresh-btn" onclick="fetchEvents()">↻</button>
+          </div>
+          <div id="events-ctrl-list">
+            <div class="alert-row">
+              <span class="alert-msg" style="color:var(--muted)">Aucune commande aujourd'hui</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VUE ALERTES ── -->
+      <div id="view-alerts" class="view">
+        <div class="section-title">JOURNAL ALERTES COMPLET</div>
+        <div class="alerts-card" style="max-height:600px;overflow-y:auto">
+          <div id="alerts-full-list">
+            <div class="alert-row">
+              <span class="alert-msg" style="color:var(--muted)">Chargement…</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VUE HISTORIQUE DB ── -->
+      <div id="view-history" class="view">
+        <div class="section-title">HISTORIQUE CAPTEURS — BASE DE DONNÉES</div>
+        <div class="hist-summary-grid" id="hist-summary"></div>
+        <div class="history-card">
+          <div class="section-hdr">
+            <span class="section-title">LECTURES DU JOUR</span>
+            <button class="refresh-btn" onclick="fetchHistory()">↻ CHARGER</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="hist-table">
+              <thead>
+                <tr>
+                  <th>HEURE</th>
+                  <th>R1 (%)</th>
+                  <th>R2 (%)</th>
+                  <th>TEMP (°C)</th>
+                  <th>PRESSION</th>
+                  <th>GAZ ADC</th>
+                  <th>POMPE</th>
+                  <th>VANNE</th>
+                </tr>
+              </thead>
+              <tbody id="hist-tbody">
+                <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Cliquer "CHARGER" pour afficher l'historique</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="history-card">
+          <div class="section-hdr" style="margin-bottom:12px">
+            <span class="section-title">DIAGNOSTICS IA DU JOUR</span>
+            <button class="refresh-btn" onclick="fetchDiagnostics()">↻</button>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="hist-table">
+              <thead>
+                <tr><th>HEURE</th><th>SÉVÉRITÉ</th><th>DIAGNOSTIC</th><th>SOURCE</th><th>R1</th><th>R2</th><th>GAZ</th></tr>
+              </thead>
+              <tbody id="diag-tbody">
+                <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px">Cliquer ↻ pour charger</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VUE ÉVÉNEMENTS ── -->
+      <div id="view-events" class="view">
+        <div class="section-title">ÉVÉNEMENTS &amp; COMMANDES DU JOUR</div>
+        <div class="alerts-card" style="max-height:600px;overflow-y:auto">
+          <div class="section-hdr">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">ESD, alarmes, commandes manuelles</span>
+            <button class="refresh-btn" onclick="fetchEvents()">↻ ACTUALISER</button>
+          </div>
+          <div id="events-full-list">
+            <div class="alert-row"><span class="alert-msg" style="color:var(--muted)">Chargement…</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VUE RÉSEAU/SYSTÈME ── -->
+      <div id="view-network" class="view">
+        <div class="section-title">ÉTAT DU SYSTÈME</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="net-card">
+            <div class="tank-title">COMPOSANTS ACTIFS</div>
+            <div class="net-row"><span class="net-label">API Flask</span><span class="net-ok" id="sys-api">● EN LIGNE</span></div>
+            <div class="net-row"><span class="net-label">AnomalyEngine</span><span class="net-ok">● ACTIF (IF + Régression)</span></div>
+            <div class="net-row"><span class="net-label">Smart AI</span><span id="sys-ai" class="net-ok">● FALLBACK INTELLIGENT</span></div>
+            <div class="net-row"><span class="net-label">Base de données</span><span class="net-ok">● SQLite LOCAL</span></div>
+            <div class="net-row"><span class="net-label">Source données</span><span id="sys-mode" class="net-active">--</span></div>
+          </div>
+          <div class="net-card">
+            <div class="tank-title">SEUILS DE SÉCURITÉ</div>
+            <div class="net-row"><span class="net-label">Gaz WARN</span><span class="net-val">250 ADC</span></div>
+            <div class="net-row"><span class="net-label">Gaz DANGER → ESD</span><span style="color:var(--danger)">450 ADC</span></div>
+            <div class="net-row"><span class="net-label">Niveau haut</span><span class="net-val">95%</span></div>
+            <div class="net-row"><span class="net-label">Niveau bas (pompe)</span><span class="net-val">10%</span></div>
+            <div class="net-row"><span class="net-label">Risque ESD</span><span style="color:var(--danger)">≥ 85%</span></div>
+            <div class="net-row"><span class="net-label">Confirm. gaz</span><span class="net-val">3 cycles consécutifs</span></div>
+          </div>
+        </div>
+        <div class="net-card" style="margin-top:0">
+          <div class="tank-title">DERNIÈRE LECTURE COMPLÈTE</div>
+          <pre id="raw-data" style="font-family:var(--mono);font-size:10px;color:var(--muted);white-space:pre-wrap;line-height:1.6">En attente…</pre>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG API
+// ══════════════════════════════════════════════════════════════
+const API_BASE = (() => {
+  const h = window.location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:5000/api/v1';
+  return `https://${h}/api/v1`;
+})();
+
+const HEADERS_BASE = {
+  'Content-Type':               'application/json',
+  'ngrok-skip-browser-warning': '1',
+};
+
+document.getElementById('api-url-display').textContent =
+  API_BASE.replace('/api/v1', '');
+
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let jwtToken     = null;
+let userRole     = 'operator';
+let pollInterval = null;
+let chartData    = { r1: new Array(60).fill(null), r2: new Array(60).fill(null) };
+let latestData   = {};
+
+// ══════════════════════════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════════════════════════
+function selectRole(el, role) {
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+async function doLogin() {
+  const u   = document.getElementById('username').value.trim();
+  const p   = document.getElementById('password').value;
+  const btn = document.getElementById('login-btn');
+  if (!u || !p) { showLoginError('Remplir tous les champs'); return; }
+
+  btn.disabled = true; btn.textContent = 'CONNEXION…';
+  document.getElementById('login-error').style.display = 'none';
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST', headers: HEADERS_BASE, body: JSON.stringify({ username: u, password: p }),
+    });
+    if (!res.ok) { showLoginError('Identifiants incorrects'); return; }
+    const data = await res.json();
+    jwtToken = data.token;
+    userRole = data.role;
+
+    document.getElementById('login-page').classList.remove('active');
+    document.getElementById('dash-page').classList.add('active');
+    document.getElementById('user-name').textContent    = u;
+    document.getElementById('user-initial').textContent = u[0].toUpperCase();
+
+    // Masquer contrôles si opérateur
+    if (userRole !== 'admin') {
+      document.getElementById('ctrl-auth-warn').style.display = 'block';
+      document.querySelectorAll('.ctrl-btn, .btn-esd').forEach(b => b.disabled = true);
+    }
+
+    startDash();
+  } catch (e) {
+    showLoginError(`Erreur réseau : ${e.message}`);
+  } finally {
+    btn.disabled = false; btn.textContent = 'CONNEXION';
+  }
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = `✕ ${msg}`; el.style.display = 'block';
+}
+
+function doLogout() {
+  jwtToken = null;
+  if (pollInterval) clearInterval(pollInterval);
+  document.getElementById('dash-page').classList.remove('active');
+  document.getElementById('login-page').classList.add('active');
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
+}
+
+// ══════════════════════════════════════════════════════════════
+// NAVIGATION SIDEBAR
+// ══════════════════════════════════════════════════════════════
+function switchView(name, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+  // Chargement automatique à l'affichage
+  if (name === 'history')  { fetchHistory(); fetchDiagnostics(); fetchSummary(); }
+  if (name === 'alerts')   { fetchAlerts(); }
+  if (name === 'events')   { fetchEvents(); }
+  if (name === 'network')  { updateNetworkView(); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// FETCH HELPERS
+// ══════════════════════════════════════════════════════════════
+async function apiGet(endpoint) {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    headers: { ...HEADERS_BASE, 'Authorization': `Bearer ${jwtToken}` },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function apiPost(endpoint, body) {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers: { ...HEADERS_BASE, 'Authorization': `Bearer ${jwtToken}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.description || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ══════════════════════════════════════════════════════════════
+// POLLING TEMPS RÉEL
+// ══════════════════════════════════════════════════════════════
+async function fetchLatest() {
+  try {
+    const data = await apiGet('/data/latest');
+    latestData = data;
+    updateOverview(data);
+    updateAIPanel(data);
+    document.getElementById('api-indicator').className = 'api-indicator api-ok';
+    document.getElementById('api-indicator').textContent = '● API OK';
+  } catch(e) {
+    document.getElementById('api-indicator').className = 'api-indicator api-err';
+    document.getElementById('api-indicator').textContent = '● API ERR';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// MISE À JOUR OVERVIEW
+// ══════════════════════════════════════════════════════════════
+function updateOverview(data) {
+  const n1  = data.niveau?.r1    ?? 0;
+  const n2  = data.niveau?.r2    ?? 0;
+  const gaz = data.gaz?.adc      ?? 0;
+  const ia  = data.ia?.global_risk ?? 0;
+  const t1  = data.temperature?.r1 ?? 0;
+  const t2  = data.temperature?.r2 ?? -127;
+  const p   = data.pression ?? 0;
+  const pump = data.actuateurs?.pompe ?? 0;
+  const valve= data.actuateurs?.vanne ?? 0;
+  const preds = data.smart_ai?.predictions ?? {};
+
+  // Métriques principales
+  setText('d-n1',  `${Math.round(n1)}%`);
+  setText('d-n2',  `${Math.round(n2)}%`);
+  setText('d-gaz', gaz);
+  setText('d-ia',  `${Math.round(ia)}%`);
+  setText('d-pression', `${p.toFixed(1)} hPa`);
+
+  // Badges
+  setBadge('badge-n1',  n1 < 10 || n1 > 95 ? 'DANGER' : n1 > 88 ? 'WARN' : 'OK');
+  setBadge('badge-n2',  n2 > 95 ? 'DANGER' : n2 > 88 ? 'WARN' : 'OK');
+  setBadge('badge-gaz', gaz >= 450 ? 'DANGER' : gaz >= 250 ? 'WARN' : 'OK');
+  setBadge('badge-ia',  ia >= 85 ? 'DANGER' : ia >= 60 ? 'WARN' : 'OK');
+
+  // Réservoirs
+  const fillR1 = document.getElementById('fill-r1');
+  fillR1.style.height = `${n1}%`;
+  fillR1.className = 'tank-fill ' + (n1 < 10 || n1 > 95 ? 'fill-danger' : n1 > 88 ? 'fill-warn' : 'fill-green');
+  const fillR2 = document.getElementById('fill-r2');
+  fillR2.style.height = `${n2}%`;
+  fillR2.className = 'tank-fill ' + (n2 > 95 ? 'fill-danger' : n2 > 85 ? 'fill-warn' : 'fill-blue');
+
+  setText('pct-r1', `${Math.round(n1)}%`);
+  setText('pct-r2', `${Math.round(n2)}%`);
+  setText('t1-val', t1 !== -127 ? `${t1.toFixed(1)}°C` : 'N/C');
+  setText('t2-val', t2 !== -127 ? `${t2.toFixed(1)}°C` : 'N/C');
+
+  // Prédictions dans les réservoirs
+  const r1_5 = preds.r1_5min;
+  const r2_5 = preds.r2_5min;
+  setText('r1-pred', r1_5 != null ? `${r1_5.toFixed(1)}%` : '--');
+  setText('r2-pred', r2_5 != null ? `${r2_5.toFixed(1)}%` : '--');
+
+  // Badges pompe/vanne
+  const pumpEl = document.getElementById('pump-badge');
+  pumpEl.textContent = pump ? 'POMPE ON' : 'POMPE OFF';
+  pumpEl.style.color = pump ? 'var(--accent2)' : 'var(--muted)';
+  pumpEl.style.borderColor = pump ? 'rgba(0,255,157,.3)' : 'var(--border2)';
+  pumpEl.style.background  = pump ? 'rgba(0,255,157,.08)' : 'rgba(74,127,168,.1)';
+
+  const valveEl = document.getElementById('valve-badge');
+  valveEl.textContent = valve ? 'VANNE OUVERTE' : 'VANNE FERMÉE';
+  valveEl.style.color = valve ? 'var(--accent)' : 'var(--muted)';
+
+  // Réseau/capteurs card
+  setText('t1-net',   t1 !== -127 ? `${t1.toFixed(1)}°C` : 'N/C');
+  setText('gaz-net',  `${gaz} ADC`);
+  setText('if-net',   `${data.ia?.isolation_forest ?? 0}%`);
+  const src = data.smart_ai?.source ?? '--';
+  setText('ia-src',   src);
+  const trendGaz = preds.tendance_gaz ?? '--';
+  setText('gaz-trend', trendGaz === 'hausse' ? '↑ HAUSSE' : trendGaz === 'baisse' ? '↓ BAISSE' : '→ STABLE');
+
+  // Contrôle manuel - statut
+  setText('ctrl-pump-status',  pump ? 'EN MARCHE ▶' : 'ARRÊTÉE ■');
+  document.getElementById('ctrl-pump-status').style.color = pump ? 'var(--accent2)' : 'var(--warn)';
+  setText('ctrl-valve-status', valve ? 'OUVERTE ▲' : 'FERMÉE ▼');
+  document.getElementById('ctrl-valve-status').style.color = valve ? 'var(--accent)' : 'var(--muted)';
+
+  // Diagnostic IA mini
+  const smart = data.smart_ai ?? {};
+  if (smart.diagnostic) {
+    setText('ia-diag-mini', smart.diagnostic);
+    const miniSev = document.getElementById('ia-sev-mini');
+    miniSev.textContent = smart.severity ?? 'INFO';
+    miniSev.className = 'ai-severity ' + sevClass(smart.severity);
+  }
+
+  // Chart
+  chartData.r1.push(n1); chartData.r1.shift();
+  chartData.r2.push(n2); chartData.r2.shift();
+  drawChart();
+
+  // Raw data (vue réseau)
+  document.getElementById('raw-data').textContent = JSON.stringify({
+    niveaux: { r1: `${n1}%`, r2: `${n2}%` },
+    temperatures: { r1: `${t1}°C` },
+    pression: `${p} hPa`,
+    gaz: `${gaz} ADC`,
+    actuateurs: { pompe: pump ? 'ON' : 'OFF', vanne: valve ? 'OUVERTE' : 'FERMÉE' },
+    ia: { risk: `${ia}%`, if: `${data.ia?.isolation_forest ?? 0}%` },
+  }, null, 2);
+
+  setText('sys-mode', '● SIMULATION RÉALISTE');
+}
+
+// ══════════════════════════════════════════════════════════════
+// MISE À JOUR PANEL IA
+// ══════════════════════════════════════════════════════════════
+function updateAIPanel(data) {
+  const smart = data.smart_ai ?? {};
+  const ai    = data.ia ?? {};
+  const preds = smart.predictions ?? {};
+
+  // Diagnostic
+  const sev = smart.severity ?? 'INFO';
+  const sevEl = document.getElementById('ia-severity');
+  sevEl.textContent = '● ' + sev;
+  sevEl.className = 'ai-severity ' + sevClass(sev);
+
+  setText('ia-diagnostic', smart.diagnostic ?? '--');
+  setText('ia-details',    smart.details    ?? '--');
+
+  const ts = smart.timestamp ? new Date(smart.timestamp).toLocaleTimeString('fr-FR') : '--';
+  setText('ia-source', smart.source ?? '--');
+  setText('ia-ts',     ts);
+
+  // Prédictions
+  const r1_5 = preds.r1_5min;
+  const r2_5 = preds.r2_5min;
+  const tPlein = preds.temps_avant_plein_r2_min;
+  const tVide  = preds.temps_avant_vide_r1_min;
+  const auto   = smart.autonomie_h;
+
+  setText('pred-r1',     r1_5 != null ? `${r1_5.toFixed(1)}%` : '--');
+  setText('pred-r2',     r2_5 != null ? `${r2_5.toFixed(1)}%` : '--');
+  setText('pred-t-plein', tPlein != null && tPlein > 0 ? `${tPlein.toFixed(0)} min` : (tPlein === -1 ? '—' : '--'));
+  setText('pred-t-vide',  tVide  != null && tVide  > 0 ? `${tVide.toFixed(0)} min`  : (tVide  === -1 ? '—' : '--'));
+  setText('pred-autonomie', auto != null && auto > 0 ? `${auto.toFixed(1)} h` : '—');
+
+  const tg = preds.tendance_gaz;
+  const tgEl = document.getElementById('pred-gaz-trend');
+  tgEl.textContent = tg === 'hausse' ? '↑ HAUSSE' : tg === 'baisse' ? '↓ BAISSE' : '→ STABLE';
+  tgEl.className = 'pred-value ' + (tg === 'hausse' ? 'pred-danger' : tg === 'baisse' ? 'pred-ok' : 'pred-blue');
+
+  // Recommandations
+  const recos = smart.recommendations ?? [];
+  const recoContainer = document.getElementById('ia-recos');
+  if (recos.length > 0) {
+    recoContainer.innerHTML = recos.map(r =>
+      `<div class="reco-item"><span class="reco-bullet">▸</span>${r}</div>`).join('');
+  } else {
+    recoContainer.innerHTML = '<div class="reco-item"><span class="reco-bullet" style="color:var(--accent2)">✓</span>Aucune action requise — système nominal</div>';
+  }
+
+  // Commandes IA
+  const cmds = smart.commands ?? [];
+  const cmdsEl = document.getElementById('ia-cmds');
+  if (cmds.length > 0) {
+    cmdsEl.innerHTML = cmds.map(c =>
+      `<span class="ai-cmd-tag">${c}</span>`).join('');
+  } else {
+    cmdsEl.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">✓ Aucune commande générée</span>';
+  }
+
+  // Scores
+  setText('ia-if-score', `${ai.isolation_forest ?? 0}%`);
+  setText('ia-risk',     `${ai.global_risk ?? 0}%`);
+  const gasAlert = ai.gas_alert;
+  const gasEl = document.getElementById('ia-gas-alert');
+  gasEl.textContent = gasAlert ?? 'AUCUNE';
+  gasEl.style.color = gasAlert === 'DANGER_CRITIQUE' ? 'var(--danger)' :
+                      gasAlert === 'ATTENTION'       ? 'var(--warn)'  : 'var(--accent2)';
+}
+
+// ══════════════════════════════════════════════════════════════
+// ALERTES
+// ══════════════════════════════════════════════════════════════
+const SEV_COLORS = {
+  DANGER_CRITIQUE:  { dot: 'var(--danger)', cls: 'badge-danger', lbl: 'DANGER' },
+  DANGER_CONFIRMING:{ dot: 'var(--warn)',   cls: 'badge-warn',   lbl: 'WARN' },
+  SMART_AI_DANGER:  { dot: 'var(--danger)', cls: 'badge-danger', lbl: 'DANGER' },
+  SMART_AI_CRITIQUE:{ dot: 'var(--danger)', cls: 'badge-danger', lbl: 'CRITIQUE' },
+  ATTENTION:        { dot: 'var(--warn)',   cls: 'badge-warn',   lbl: 'WARN' },
+  COMMANDE_MANUELLE:{ dot: 'var(--accent)', cls: '',             lbl: 'CMD' },
+  ANOMALIE:         { dot: 'var(--warn)',   cls: 'badge-warn',   lbl: 'ANOMALIE' },
+};
+
+function renderAlertRow(a) {
+  const c  = SEV_COLORS[a.type] || { dot: 'var(--accent2)', cls: 'badge-ok', lbl: 'INFO' };
+  const ts = new Date(a.timestamp);
+  const t  = ts.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const msg = `${a.type}${a.valeur != null ? ' — ' + a.valeur : ''}`;
+  return `<div class="alert-row">
+    <div class="alert-dot" style="background:${c.dot}"></div>
+    <span class="alert-time">${t}</span>
+    <span class="alert-msg" title="${msg}">${msg}</span>
+    <span class="alert-level ${c.cls}" style="border:1px solid currentColor;flex-shrink:0">${c.lbl}</span>
+  </div>`;
+}
+
+async function fetchAlerts() {
+  try {
+    const data = await apiGet('/alerts');
+    const alerts = data.alerts ?? [];
+    document.getElementById('alert-count').textContent = alerts.filter(a => a.type !== 'COMMANDE_MANUELLE').length;
+    document.getElementById('alerts-mini').innerHTML = alerts.slice(0,6).map(renderAlertRow).join('') ||
+      '<div class="alert-row"><span class="alert-msg" style="color:var(--muted)">Aucune alerte</span></div>';
+    document.getElementById('alerts-full-list').innerHTML = alerts.map(renderAlertRow).join('') ||
+      '<div class="alert-row"><span class="alert-msg" style="color:var(--muted)">Aucune alerte</span></div>';
+  } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// COMMANDES MANUELLES
+// ══════════════════════════════════════════════════════════════
+async function sendCtrlCmd(device, action) {
+  const fbId = 'fb-' + device;
+  try {
+    showFeedback(fbId, 'Envoi…', 'pending');
+    const result = await apiPost(`/cmd/${device}`, { action });
+    showFeedback(fbId, `✓ ${result.command} envoyé`, 'ok');
+    setTimeout(() => fetchLatest(), 500);
+  } catch(e) {
+    showFeedback(fbId, `✕ Erreur: ${e.message}`, 'err');
+  }
+}
+
+async function triggerESD() {
+  if (!confirm('⚠ ARRÊT D\'URGENCE\nCette action va couper pompe + vanne immédiatement.\n\nConfirmer ?')) return;
+  if (!confirm('DERNIÈRE CONFIRMATION\nDéclencher CMD:ESD sur l\'Arduino ?')) return;
+  try {
+    showFeedback('fb-esd', 'Envoi ESD…', 'pending');
+    const result = await apiPost('/cmd/esd', {});
+    showFeedback('fb-esd', `⚡ ${result.command} — Arrêt d'urgence déclenché`, 'ok');
+    setTimeout(() => fetchLatest(), 500);
+  } catch(e) {
+    showFeedback('fb-esd', `✕ Erreur: ${e.message}`, 'err');
+  }
+}
+
+function showFeedback(id, msg, type) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'cmd-feedback ' + (type === 'err' ? 'cmd-err' : 'cmd-ok');
+  el.style.display = 'block';
+  if (type !== 'pending') setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// HISTORIQUE BASE DE DONNÉES
+// ══════════════════════════════════════════════════════════════
+async function fetchHistory() {
+  const tbody = document.getElementById('hist-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:16px">Chargement…</td></tr>';
+  try {
+    const data = await apiGet('/history/today?limit=100');
+    const rows = data.readings ?? [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:16px">Aucune donnée pour aujourd\'hui</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const t = new Date(r.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const gasColor = r.g >= 450 ? 'var(--danger)' : r.g >= 250 ? 'var(--warn)' : 'var(--accent2)';
+      return `<tr>
+        <td>${t}</td>
+        <td style="color:${r.n1>95||r.n1<10?'var(--danger)':r.n1>88?'var(--warn)':'var(--accent2)'}">${r.n1?.toFixed(1) ?? '--'}%</td>
+        <td style="color:${r.n2>95?'var(--danger)':r.n2>88?'var(--warn)':'var(--accent)'}">${r.n2?.toFixed(1) ?? '--'}%</td>
+        <td>${r.t1?.toFixed(1) ?? '--'}°C</td>
+        <td>${r.p?.toFixed(1) ?? '--'} hPa</td>
+        <td style="color:${gasColor}">${r.g ?? '--'}</td>
+        <td style="color:${r.pump?'var(--accent2)':'var(--muted)'}">${r.pump ? 'ON' : 'OFF'}</td>
+        <td style="color:${r.valve?'var(--accent)':'var(--muted)'}">${r.valve ? 'OUVERTE' : 'FERMÉE'}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--danger);text-align:center;padding:16px">Erreur: ${e.message}</td></tr>`;
+  }
+}
+
+async function fetchDiagnostics() {
+  const tbody = document.getElementById('diag-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:12px">Chargement…</td></tr>';
+  try {
+    const data = await apiGet('/history/diagnostics');
+    const rows = data.diagnostics ?? [];
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:12px">Aucun diagnostic</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const t = new Date(r.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      const c = r.severity === 'CRITIQUE' ? 'var(--danger)' : r.severity === 'DANGER' ? 'var(--danger)' :
+                r.severity === 'ATTENTION' ? 'var(--warn)' : 'var(--accent2)';
+      return `<tr>
+        <td>${t}</td>
+        <td style="color:${c}">${r.severity ?? '--'}</td>
+        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis" title="${r.diagnostic}">${r.diagnostic ?? '--'}</td>
+        <td style="color:var(--muted)">${r.source ?? '--'}</td>
+        <td>${r.n1?.toFixed(1) ?? '--'}%</td>
+        <td>${r.n2?.toFixed(1) ?? '--'}%</td>
+        <td>${r.g ?? '--'}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function fetchSummary() {
+  try {
+    const s = await apiGet('/history/summary');
+    if (!s.count) return;
+    document.getElementById('hist-summary').innerHTML = `
+      <div class="hist-sum-card"><div class="hist-sum-label">MESURES AUJOURD'HUI</div><div class="hist-sum-value">${s.count}</div></div>
+      <div class="hist-sum-card"><div class="hist-sum-label">R1 MIN/MAX</div><div class="hist-sum-value" style="font-size:14px">${s.n1_min?.toFixed(0)}% / ${s.n1_max?.toFixed(0)}%</div></div>
+      <div class="hist-sum-card"><div class="hist-sum-label">GAZ MAX</div><div class="hist-sum-value" style="color:${s.g_max>=450?'var(--danger)':s.g_max>=250?'var(--warn)':'var(--accent2)'}">${s.g_max} ADC</div></div>
+      <div class="hist-sum-card"><div class="hist-sum-label">ÉVÉNEMENTS</div><div class="hist-sum-value" style="color:${s.nb_events>0?'var(--warn)':'var(--accent2)'}">${s.nb_events}</div></div>
+    `;
+  } catch(e) {}
+}
+
+async function fetchEvents() {
+  const render = (el) => {
+    apiGet('/history/events').then(data => {
+      const evs = data.events ?? [];
+      if (!evs.length) {
+        el.innerHTML = '<div class="alert-row"><span class="alert-msg" style="color:var(--muted)">Aucun événement aujourd\'hui</span></div>';
+        return;
+      }
+      el.innerHTML = evs.map(e => {
+        const t = new Date(e.ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const isESD = e.type === 'CMD:ESD' || e.type === 'ESD';
+        const isCmd = e.type?.startsWith('CMD:');
+        const dot  = isESD ? 'var(--danger)' : isCmd ? 'var(--accent)' : 'var(--warn)';
+        return `<div class="alert-row">
+          <div class="alert-dot" style="background:${dot}"></div>
+          <span class="alert-time">${t}</span>
+          <span class="alert-msg">${e.type} ${e.detail ? '— ' + e.detail : ''}</span>
+          <span class="alert-level" style="border:1px solid ${dot};color:${dot};font-size:9px;padding:2px 8px;border-radius:20px">${e.type?.split(':')[0] ?? 'EVT'}</span>
+        </div>`;
+      }).join('');
+    }).catch(() => {});
+  };
+  render(document.getElementById('events-full-list'));
+  render(document.getElementById('events-ctrl-list'));
+}
+
+// ══════════════════════════════════════════════════════════════
+// CANVAS CHART
+// ══════════════════════════════════════════════════════════════
+function drawChart() {
+  const cv = document.getElementById('c-hist');
+  if (!cv) return;
+  const W = cv.offsetWidth || 600, H = 140;
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#0a1628'; ctx.fillRect(0,0,W,H);
+
+  const toY = v => H - 8 - (v / 100) * (H - 16);
+  const toX = (i, n) => 8 + i * (W - 16) / (n - 1);
+
+  // Grid
+  ctx.strokeStyle = '#1e2d4a'; ctx.lineWidth = 0.5;
+  [25, 50, 75].forEach(v => {
+    const y = toY(v);
+    ctx.beginPath(); ctx.moveTo(8, y); ctx.lineTo(W - 8, y); ctx.stroke();
+    ctx.fillStyle = '#1e3a5f'; ctx.font = '9px monospace'; ctx.fillText(v + '%', W - 22, y - 2);
+  });
+
+  // Lines
+  [[chartData.r1, '#00ff9d'], [chartData.r2, '#00d4ff']].forEach(([data, color]) => {
+    const pts = data.map((v, i) => ({v, i})).filter(x => x.v !== null);
+    if (pts.length < 2) return;
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, color + '33'); grad.addColorStop(1, color + '00');
+    ctx.beginPath();
+    pts.forEach(({v, i}, idx) => {
+      const x = toX(i, data.length), y = toY(v);
+      idx === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  });
+
+  // Legend
+  ctx.fillStyle = '#00ff9d'; ctx.font = '9px monospace'; ctx.fillText('— R1', 10, H - 4);
+  ctx.fillStyle = '#00d4ff'; ctx.fillText('— R2', 50, H - 4);
+}
+
+// ══════════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════════
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function setBadge(id, level) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'mc-badge ' + (level === 'DANGER' ? 'badge-danger' : level === 'WARN' ? 'badge-warn' : 'badge-ok');
+  el.textContent = level === 'DANGER' ? 'DANGER' : level === 'WARN' ? 'ATTENTION' : 'NORMAL';
+}
+
+function sevClass(sev) {
+  if (!sev) return 'sev-info';
+  const s = sev.toUpperCase();
+  if (s === 'CRITIQUE') return 'sev-critique';
+  if (s === 'DANGER')   return 'sev-danger';
+  if (s === 'ATTENTION') return 'sev-attention';
+  return 'sev-info';
+}
+
+function updateNetworkView() {
+  if (latestData.smart_ai) {
+    const src = latestData.smart_ai.source;
+    setText('sys-ai', src === 'gemma4' ? '● GEMMA4 ACTIF' : '● FALLBACK INTELLIGENT');
+  }
+}
+
+function updateClock() {
+  const now = new Date();
+  setText('clock', now.toLocaleTimeString('fr-FR'));
+}
+
+// ══════════════════════════════════════════════════════════════
+// DÉMARRAGE DASHBOARD
+// ══════════════════════════════════════════════════════════════
+function startDash() {
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  fetchLatest();
+  fetchAlerts();
+
+  pollInterval = setInterval(fetchLatest, 2000);
+  setInterval(fetchAlerts, 5000);
+}
+
+// Vérification API au chargement
+(async () => {
+  try {
+    const res = await fetch(API_BASE.replace('/api/v1', '') + '/health', { headers: HEADERS_BASE });
+    if (res.ok) {
+      document.getElementById('api-status').textContent = 'API EN LIGNE ✓';
+    } else {
+      document.getElementById('api-status').textContent = 'API HORS LIGNE';
+    }
+  } catch(e) {
+    document.getElementById('api-status').textContent = 'API NON DÉMARRÉE';
+  }
+})();
+</script>
+</body>
+</html>

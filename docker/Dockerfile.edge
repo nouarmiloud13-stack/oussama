@@ -1,0 +1,35 @@
+FROM python:3.11-slim
+
+# Métadonnées
+LABEL maintainer="M2 RSID 2025-2026"
+LABEL description="GNL IoT Edge Node — API REST + IA embarquée"
+
+WORKDIR /opt/gnl
+
+# Dépendances système (minimales pour image légère)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installation dépendances Python en premier (cache Docker layer)
+# context = racine projet → raspberry_pi/ accessible directement
+COPY raspberry_pi/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copie du code source applicatif
+COPY raspberry_pi/ .
+
+# Création du répertoire de logs avec permissions restreintes
+RUN mkdir -p /var/log/gnl \
+    && chmod 755 /var/log/gnl
+
+# Port API REST
+EXPOSE 5000
+
+# Healthcheck interne
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -sf http://localhost:5000/health || exit 1
+
+CMD ["python3", "gnl_main.py"]

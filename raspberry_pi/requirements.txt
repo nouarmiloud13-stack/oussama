@@ -1,0 +1,30 @@
+# requirements.txt — Dépendances Python pour le nœud Edge GNL (Raspberry Pi 4)
+# Installation : pip3 install -r requirements.txt --break-system-packages
+
+# ── Communication série ────────────────────────────────────────────────────────
+pyserial==3.5
+
+# ── MQTT ──────────────────────────────────────────────────────────────────────
+paho-mqtt==2.0.0
+
+# ── Base de données ───────────────────────────────────────────────────────────
+influxdb-client==1.43.0
+pymongo==4.8.0
+
+# ── IA / Machine Learning ─────────────────────────────────────────────────────
+scikit-learn==1.5.1
+numpy==1.26.4
+pandas==2.2.2
+
+# ── IA Claude (Anthropic) — Smart AI autonome ─────────────────────────────────
+anthropic>=0.40.0
+
+# ── API REST ──────────────────────────────────────────────────────────────────
+Flask==3.0.3
+flask-cors==4.0.1          # CORS pour ngrok + dashboard HTML
+PyJWT==2.8.0
+gunicorn==22.0.0
+
+# ── Utilitaires ───────────────────────────────────────────────────────────────
+requests==2.32.3
+python-dotenv==1.0.1

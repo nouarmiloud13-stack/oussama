@@ -1,0 +1,53 @@
+# ── À AJOUTER dans docker/docker-compose.yml ─────────────────────────────────
+# Colle ce bloc dans la section "services:" du docker-compose.yml existant
+# et ajoute le volume "gnl_models" dans la section "volumes:"
+#
+# Prérequis : avoir lancé make download-gemma4 (ou python3 download_gemma4.py)
+# ─────────────────────────────────────────────────────────────────────────────
+
+  # ── Gemma4 E2B — Serveur llama.cpp (Edge AI Local) ──────────────────────────
+  gemma4:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    container_name: gnl_gemma4
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env
+    volumes:
+      # Chemin vers les modèles téléchargés par download_gemma4.py
+      - ../docker/models/gemma4:/models:ro
+    command: >
+      --model /models/${GEMMA4_MODEL_FILE}
+      --mmproj /models/${GEMMA4_MMPROJ_FILE}
+      --ctx-size ${GEMMA4_CTX:-4096}
+      --threads ${GEMMA4_THREADS:-4}
+      --n-gpu-layers ${GEMMA4_GPU_LAYERS:-0}
+      --host 0.0.0.0
+      --port 8080
+      --log-disable
+    networks:
+      - gnl_net
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+    # Gemma4 E2B Q4_K_M : ~3.5 GB RAM — réserver ~5 GB sur RPi4 8GB
+    deploy:
+      resources:
+        limits:
+          memory: 5G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s   # llama.cpp charge le modèle au démarrage (~30s)
+
+
+# ── Dans la section volumes: ──────────────────────────────────────────────────
+# Ajouter :
+#   gnl_models:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       o: bind
+#       device: ./models/gemma4

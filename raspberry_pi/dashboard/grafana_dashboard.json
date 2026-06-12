@@ -1,0 +1,174 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_INFLUXDB",
+      "label": "InfluxDB GNL",
+      "description": "InfluxDB 2.x — bucket gnl_monitoring",
+      "type": "datasource",
+      "pluginId": "influxdb",
+      "pluginName": "InfluxDB"
+    }
+  ],
+  "title": "GNL IoT — Monitoring Temps Réel",
+  "uid":   "gnl_dashboard_v1",
+  "version": 1,
+  "schemaVersion": 38,
+  "refresh": "2s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Niveau Réservoir R1 (%)",
+      "type": "gauge",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100, "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": null },
+              { "color": "yellow", "value": 15 },
+              { "color": "green",  "value": 25 },
+              { "color": "orange", "value": 88 },
+              { "color": "red",    "value": 95 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "query": "from(bucket:\"gnl_monitoring\") |> range(start: -5s) |> filter(fn:(r)=> r._measurement==\"niveau\" and r.reservoir==\"R1\" and r._field==\"valeur\") |> last()"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Niveau Réservoir R2 (%)",
+      "type": "gauge",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 6 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100, "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",    "value": null },
+              { "color": "yellow", "value": 15 },
+              { "color": "green",  "value": 25 },
+              { "color": "orange", "value": 88 },
+              { "color": "red",    "value": 95 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "query": "from(bucket:\"gnl_monitoring\") |> range(start: -5s) |> filter(fn:(r)=> r._measurement==\"niveau\" and r.reservoir==\"R2\" and r._field==\"valeur\") |> last()"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Score Risque Global IA (%)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 3 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 40 },
+              { "color": "orange", "value": 60 },
+              { "color": "red",    "value": 70 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "query": "from(bucket:\"gnl_monitoring\") |> range(start: -5s) |> filter(fn:(r)=> r._measurement==\"ia_scores\" and r._field==\"global_risk\") |> last()"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "Isolation Forest Score",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 3 },
+      "targets": [{
+        "query": "from(bucket:\"gnl_monitoring\") |> range(start: -5s) |> filter(fn:(r)=> r._measurement==\"ia_scores\" and r._field==\"isolation_forest\") |> last()"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "Gaz MQ-4 (ADC)",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 3 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 1023,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 250 },
+              { "color": "red",    "value": 450 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "query": "from(bucket:\"gnl_monitoring\") |> range(start: -5s) |> filter(fn:(r)=> r._measurement==\"gaz\" and r._field==\"valeur_adc\") |> last()"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "Évolution Niveaux (1h)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 6, "w": 16, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "min": 0, "max": 100 }
+      },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "query": "from(bucket:\"gnl_monitoring\") |> range(start: -1h) |> filter(fn:(r)=> r._measurement==\"niveau\") |> filter(fn:(r)=> r._field==\"valeur\") |> aggregateWindow(every: 10s, fn: mean)"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Températures DS18B20 (°C)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 14, "w": 8, "h": 6 },
+      "targets": [{
+        "query": "from(bucket:\"gnl_monitoring\") |> range(start: -1h) |> filter(fn:(r)=> r._measurement==\"temperature\") |> aggregateWindow(every: 30s, fn: mean)"
+      }]
+    },
+    {
+      "id": 8,
+      "title": "Pression BMP280 (hPa)",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 14, "w": 8, "h": 6 },
+      "targets": [{
+        "query": "from(bucket:\"gnl_monitoring\") |> range(start: -1h) |> filter(fn:(r)=> r._measurement==\"pression\") |> aggregateWindow(every: 30s, fn: mean)"
+      }]
+    },
+    {
+      "id": 9,
+      "title": "Alertes (dernières 24h)",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 6 },
+      "targets": [{
+        "query": "from(bucket:\"gnl_monitoring\") |> range(start: -24h) |> filter(fn:(r)=> r._measurement==\"alertes\")"
+      }]
+    }
+  ],
+  "annotations": {
+    "list": [{
+      "name":    "Alertes GNL",
+      "datasource": { "type": "influxdb", "uid": "DS_INFLUXDB" },
+      "enable": true,
+      "hide":   false,
+      "iconColor": "red",
+      "query": "from(bucket:\"gnl_monitoring\") |> range(start: v.timeRangeStart) |> filter(fn:(r)=> r._measurement==\"alertes\")"
+    }]
+  }
+}

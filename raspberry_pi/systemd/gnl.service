@@ -1,0 +1,33 @@
+[Unit]
+Description=Nouarmiloud IoT Edge Node — Système de surveillance réservoirs GNL
+After=network.target mosquitto.service influxdb.service
+Wants=mosquitto.service influxdb.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/gnl
+ExecStart=/usr/bin/python3 /opt/gnl/gnl_main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Watchdog systemd — redémarrage auto si le processus ne répond plus
+WatchdogSec=30
+NotifyAccess=main
+
+# Variables d'environnement
+Environment="PYTHONPATH=/opt/gnl"
+Environment="GNL_JWT_SECRET=gnl_jwt_secret_change_in_prod"
+
+# Limites ressources (sécurité)
+LimitNOFILE=1024
+MemoryMax=512M
+
+# Journalisation
+SyslogIdentifier=gnl-edge
+
+[Install]
+WantedBy=multi-user.target

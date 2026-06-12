@@ -1,0 +1,45 @@
+# /mosquitto/config/acl — Contrôle d'accès MQTT par topic
+# Format : user <username> / topic [read|write|readwrite] <topic>
+#
+# Rôles :
+#   gnl_publisher  → publie les données capteurs (Raspberry Pi / simulateur)
+#   gnl_dashboard  → lit toutes les données (Dashboard HTML + Grafana + healthcheck)
+#   gnl_admin      → lecture + écriture + commandes (opérateur autorisé)
+#
+# Fix : gnl_dashboard manquait la permission `$SYS/#` → healthcheck timeout
+
+# ── gnl_publisher (Raspberry Pi 4 / simulateur) ───────────────────────────────
+user gnl_publisher
+topic write gnl/niveau/r1
+topic write gnl/niveau/r2
+topic write gnl/temperature/r1
+topic write gnl/temperature/r2
+topic write gnl/gaz/mq4
+topic write gnl/pression
+topic write gnl/ia/score
+topic write gnl/alerte
+topic write gnl/status
+topic write gnl/sim/raw
+topic read  gnl/cmd/pompe
+topic read  gnl/cmd/vanne
+topic read  gnl/cmd/esd
+
+# ── gnl_dashboard (Dashboard web + Grafana + healthcheck Docker) ───────────────
+user gnl_dashboard
+# $SYS : métriques internes du broker (uptime, clients, messages)
+# OBLIGATOIRE pour le healthcheck `mosquitto_sub -t '$SYS/broker/uptime' -C 1`
+# Sans cette ligne : souscription silencieusement refusée → timeout → Unhealthy
+topic read $SYS/#
+topic read gnl/niveau/#
+topic read gnl/temperature/#
+topic read gnl/gaz/#
+topic read gnl/pression
+topic read gnl/ia/#
+topic read gnl/alerte
+topic read gnl/status
+topic read gnl/sim/#
+
+# ── gnl_admin (opérateur admin) ────────────────────────────────────────────────
+user gnl_admin
+topic readwrite $SYS/#
+topic readwrite gnl/#

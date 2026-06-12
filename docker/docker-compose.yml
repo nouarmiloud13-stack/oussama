@@ -1,0 +1,338 @@
+# docker-compose.yml — Environnement de développement Nouarmiloud IoT avec ngrok
+# Emplacement : docker/docker-compose.yml
+# Usage : depuis la racine du projet → make start
+#         ou manuellement → docker compose -f docker/docker-compose.yml up -d
+#
+# ⚠️  MQTT plain (port 1883) — réseau Docker interne uniquement.
+#     ngrok expose uniquement l'API REST + Dashboard (port 5000) via HTTPS.
+#
+# ARCHITECTURE NGROK :
+#   Internet → ngrok (HTTPS 443) → gnl_edge:5000 (API REST + Dashboard HTML)
+#   Docker interne : mosquitto:1883, influxdb:8086, grafana:3000
+#
+# IMPORTANT : tous les chemins relatifs sont exprimés par rapport à ce fichier
+# (docker/), donc "../" remonte à la racine projet.
+
+services:
+
+  # ── Mosquitto MQTT Broker ────────────────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: gnl_mosquitto
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mkdir -p /mosquitto/data /mosquitto/log
+        mosquitto_passwd -c -b /mosquitto/data/passwd \
+          "$${MQTT_USER_PUBLISHER}" "$${MQTT_PASS_PUBLISHER}"
+        mosquitto_passwd    -b /mosquitto/data/passwd \
+          "$${MQTT_USER_DASHBOARD}" "$${MQTT_PASS_DASHBOARD}"
+        mosquitto_passwd    -b /mosquitto/data/passwd \
+          "$${MQTT_USER_ADMIN}" "$${MQTT_PASS_ADMIN}"
+        chmod 600 /mosquitto/data/passwd
+        chown mosquitto:mosquitto /mosquitto/data/passwd
+        echo "[mosquitto] passwd créé dans /mosquitto/data/passwd"
+        exec mosquitto -c /mosquitto/config/mosquitto.conf
+
+    env_file:
+      - ../.env
+
+    ports:
+      - "1883:1883"
+
+    volumes:
+      - ../raspberry_pi/mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ../raspberry_pi/mqtt/acl:/mosquitto/config/acl:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+    networks:
+      - gnl_net
+
+    restart: unless-stopped
+
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - >
+          mosquitto_sub
+          -h localhost
+          -p 1883
+          -u gnl_dashboard
+          -P "GNL_Dash_2025!"
+          -t '$$SYS/broker/uptime'
+          -C 1
+          --quiet
+          -W 5
+          2>/dev/null || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── InfluxDB 2.x ─────────────────────────────────────────────────────────────
+  influxdb:
+    image: influxdb:2.7
+    container_name: gnl_influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE:        setup
+      DOCKER_INFLUXDB_INIT_USERNAME:    gnl_admin
+      DOCKER_INFLUXDB_INIT_PASSWORD:    "GNL_Influx_2025!"
+      DOCKER_INFLUXDB_INIT_ORG:         gnl_org
+      DOCKER_INFLUXDB_INIT_BUCKET:      gnl_monitoring
+      DOCKER_INFLUXDB_INIT_RETENTION:   30d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: "gnl_influx_token_secret_2025"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - gnl_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── Grafana ──────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana-oss:10.4.0
+    container_name: gnl_grafana
+    # Grafana reste interne — accès local uniquement (pas exposé par ngrok ici)
+    # Décommenter si tu veux accès local direct :
+    # ports:
+    #   - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER:     gnl_admin
+      GF_SECURITY_ADMIN_PASSWORD: "GNL_Grafana_2025!"
+      GF_USERS_ALLOW_SIGN_UP:     "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/gnl_dashboard.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../raspberry_pi/dashboard/grafana_dashboard.json:/etc/grafana/provisioning/dashboards/gnl_dashboard.json:ro
+    networks:
+      - gnl_net
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── MongoDB — Historique GNL (lectures, diagnostics IA, évènements) ─────────
+  mongodb:
+    image: mongo:7.0
+    container_name: gnl_mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
+      MONGO_INITDB_DATABASE:      gnl_history
+    ports:
+      - "27017:27017"    # exposé sur l'hôte pour accès depuis Flask local (Codespaces)
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - gnl_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Mongo-Express — Interface web MongoDB ────────────────────────────────────
+  #
+  #  Accès local : http://localhost:8081
+  #  Login       : admin / GNL_MongoUI_2025!
+  #
+  #  ⚠️  Exposé uniquement sur l'hôte (pas via ngrok) — données internes
+  # ─────────────────────────────────────────────────────────────────────────────
+  mongo_express:
+    image: mongo-express:1.0.2
+    container_name: gnl_mongo_express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASS}
+      ME_CONFIG_MONGODB_URL:           mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME:    admin
+      ME_CONFIG_BASICAUTH_PASSWORD:    GNL_MongoUI_2025!
+      ME_CONFIG_MONGODB_ENABLE_ADMIN:  "true"
+      ME_CONFIG_SITE_BASEURL:          /
+    networks:
+      - gnl_net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── API REST + Edge AI ────────────────────────────────────────────────────────
+  gnl_edge:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.edge
+    image: gnl_edge_node
+    container_name: gnl_edge_node
+    ports:
+      - "5000:5000"   # exposé sur l'hôte pour que ngrok puisse le tunneler
+    environment:
+      MQTT_HOST:           mosquitto
+      MQTT_PORT:           "1883"
+      MQTT_USER_PUBLISHER: gnl_publisher
+      MQTT_PASS_PUBLISHER: "GNL_Secure_2025!"
+      INFLUX_URL:          http://influxdb:8086
+      INFLUX_TOKEN:        gnl_influx_token_secret_2025
+      GNL_JWT_SECRET:      gnl_jwt_secret_change_in_prod
+      SERIAL_PORT:         SIMULATED
+      # URL publique ngrok transmise à Flask pour les redirections CORS
+      PUBLIC_URL:          https://theology-custody-rocky.ngrok-free.dev
+      # Smart AI (Gemma4 ou Claude)
+      GNL_AI_PROVIDER:     ${GNL_AI_PROVIDER:-gemma4}
+      GEMMA4_HOST:         gemma4
+      GEMMA4_SERVER_PORT:  "8080"
+      GEMMA4_TIMEOUT:      ${GEMMA4_TIMEOUT:-45}
+      ANTHROPIC_API_KEY:   ${ANTHROPIC_API_KEY:-}
+      GNL_AI_MODEL:        ${GNL_AI_MODEL:-claude-haiku-4-5-20251001}
+      GNL_AI_INTERVAL:     ${GNL_AI_INTERVAL:-30}
+      GNL_AI_RISK_TRIGGER: ${GNL_AI_RISK_TRIGGER:-60}
+      GNL_AI_MAX_TOKENS:   ${GNL_AI_MAX_TOKENS:-512}
+      # MongoDB historique
+      MONGO_URI:  mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/
+      MONGO_DB:   gnl_history
+      MONGO_TTL_DAYS: ${MONGO_TTL_DAYS:-30}
+      # Watchdog sécurité
+      WATCHDOG_TIMEOUT_S:       ${WATCHDOG_TIMEOUT_S:-30}
+      WATCHDOG_MAX_ERRORS:      ${WATCHDOG_MAX_ERRORS:-10}
+      WATCHDOG_TICK_S:          ${WATCHDOG_TICK_S:-2.0}
+      WATCHDOG_OS_SHUTDOWN:     ${WATCHDOG_OS_SHUTDOWN:-false}
+      WATCHDOG_SENSORS_DEAD_MAX: ${WATCHDOG_SENSORS_DEAD_MAX:-5}
+      ESD_ACK_TIMEOUT_S:        ${ESD_ACK_TIMEOUT_S:-10}
+      # Seuils IA
+      GAS_WARN:     ${GAS_WARN:-250}
+      GAS_DANGER:   ${GAS_DANGER:-450}
+      LEVEL_HIGH:   ${LEVEL_HIGH:-95}
+      LEVEL_LOW:    ${LEVEL_LOW:-10}
+      CONFIRM_GAS:  ${CONFIRM_GAS:-3}
+    volumes:
+      - ../raspberry_pi:/opt/gnl:ro
+      - gnl_logs:/var/log/gnl
+    networks:
+      - gnl_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      influxdb:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── Gemma4 E2B — Serveur llama.cpp (Edge AI local, hors-ligne) ──────────────
+  #
+  # Prérequis : make download-gemma4  (télécharge ~3.5 GB)
+  # Mémoire requise : ~5 GB RAM (RPi4 8GB recommandé)
+  # ─────────────────────────────────────────────────────────────────────────────
+  gemma4:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: gnl_gemma4
+    profiles:
+      - ai
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env
+    volumes:
+      - ../docker/models/gemma4:/models:ro
+    command: >
+      --model /models/${GEMMA4_MODEL_FILE}
+      --ctx-size ${GEMMA4_CTX:-4096}
+      --threads ${GEMMA4_THREADS:-4}
+      --n-gpu-layers ${GEMMA4_GPU_LAYERS:-0}
+      --host 0.0.0.0
+      --port 8080
+      --log-disable
+    networks:
+      - gnl_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 5G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s   # chargement modèle ~60s sur RPi4
+
+  # ── ngrok — Tunnel HTTPS vers l'API REST (port 5000) ─────────────────────────
+  #
+  # ngrok expose gnl_edge:5000 sur https://theology-custody-rocky.ngrok-free.dev
+  #
+  # Prérequis :
+  #   1. Avoir un compte ngrok (ngrok.com)
+  #   2. Réserver le domaine statique dans le dashboard ngrok
+  #   3. Renseigner NGROK_AUTHTOKEN dans le fichier .env
+  #
+  # ngrok dashboard local : http://localhost:4040
+  # ─────────────────────────────────────────────────────────────────────────────
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: gnl_ngrok
+    profiles:
+      - ngrok
+    command:
+      - "http"
+      - "--domain=${NGROK_DOMAIN}"
+      - "gnl_edge_node:5000"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"    # dashboard web ngrok (inspecter les tunnels)
+    networks:
+      - gnl_net
+    depends_on:
+      gnl_edge:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4040/api/tunnels || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mosquitto_data:
+  mosquitto_log:
+  influxdb_data:
+  influxdb_config:
+  grafana_data:
+  gnl_logs:
+  mongodb_data:
+
+networks:
+  gnl_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
