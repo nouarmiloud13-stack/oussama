@@ -76,7 +76,7 @@ _mongo             = None   # MongoWriter injecté depuis gnl_main
 
 def set_mongo(mongo_writer):
     global _mongo
-    _mongo = mongo_writer  # dernier diagnostic Smart AI (Claude)
+    _mongo = mongo_writer  # dernier diagnostic Smart AI (Gemma4)
 
 # ── Middleware ngrok — bypass page d'avertissement ─────────────────────────────
 @app.before_request
@@ -246,7 +246,7 @@ def ai_scores():
 @app.route("/api/v1/ai/diagnostic")
 @require_auth("operator")
 def ai_diagnostic():
-    """Retourne le dernier diagnostic complet produit par le Smart AI (Claude)."""
+    """Retourne le dernier diagnostic complet produit par le Smart AI (Gemma4)."""
     with _lock:
         diag = dict(_smart_diagnostic)
     if not diag:
